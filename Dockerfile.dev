@@ -1,0 +1,29 @@
+# Development Dockerfile for PracticeLink Platform
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies for development
+RUN apk add --no-cache curl
+
+# Copy package files
+COPY package*.json ./
+COPY packages/design/package.json ./packages/design/
+COPY packages/sdk/package.json ./packages/sdk/
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Copy source code (will be overridden by volume in docker-compose)
+COPY . .
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:5173/ || exit 1
+
+# Default command (can be overridden in docker-compose)
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

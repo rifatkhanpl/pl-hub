@@ -1,0 +1,48 @@
+# Docker Compose for PracticeLink Platform Development
+version: '3.8'
+
+services:
+  # Main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/packages/design/node_modules
+      - /app/packages/sdk/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_GATEWAY_URL=http://localhost:3001
+    command: npm run dev
+    depends_on:
+      - design-system
+
+  # Design system development server (optional)
+  design-system:
+    build:
+      context: ./packages/design
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./packages/design:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+
+  # Future: Individual module containers
+  # hco-module:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.hco
+  #   ports:
+  #     - "3001:80"
+  #   environment:
+  #     - MAIN_HUB_URL=http://app:5173
+
+networks:
+  default:
+    name: practicelink-network

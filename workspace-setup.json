@@ -1,0 +1,25 @@
+{
+  "name": "practicelink-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:main": "npm run dev --workspace=apps/main-hub",
+    "dev:hco": "npm run dev --workspace=apps/hco-platform",
+    "dev:hcp": "npm run dev --workspace=apps/hcp-platform",
+    "dev:comms": "npm run dev --workspace=apps/comms-platform",
+    "build:all": "npm run build --workspaces",
+    "lint:all": "npm run lint --workspaces",
+    "test:all": "npm run test --workspaces",
+    "clean": "npm run clean --workspaces",
+    "install:all": "npm install --workspaces",
+    "sync:design": "echo 'Design system synced across all apps automatically!'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}
