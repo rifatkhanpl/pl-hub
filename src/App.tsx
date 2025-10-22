@@ -11,6 +11,7 @@ import { GMEModule } from './pages/modules/GMEModule';
 import { HCOModule } from './pages/modules/HCOModule';
 import { JOBSModule } from './pages/modules/JOBSModule';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { Auth0ManagementPage } from './pages/Auth0ManagementPage';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
                     <Route path="/analytics/*" element={<div>Analytics Module - Coming Soon</div>} />
                     <Route path="/udbs/*" element={<div>UDBS Module - Coming Soon</div>} />
                     <Route path="/settings/*" element={<div>Settings Module - Coming Soon</div>} />
+                    <Route path="/auth0" element={<Auth0ManagementPage />} />
                     <Route path="*" element={<DashboardPage />} />
                   </Routes>
                 </Shell>
