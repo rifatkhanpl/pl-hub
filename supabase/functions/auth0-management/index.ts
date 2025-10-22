@@ -105,22 +105,8 @@ async function getAllUsersViaExport(): Promise<any[]> {
   const token = await getAuth0Token();
   const domain = Deno.env.get('AUTH0_DOMAIN');
 
-  console.log('Getting connections...');
-  // Get the Username-Password-Authentication connection ID
-  const connectionsRes = await fetch(`https://${domain}/api/v2/connections?strategy=auth0`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  const connections = await connectionsRes.json();
-  const auth0Connection = connections.find((c: any) =>
-    c.strategy === 'auth0' && c.name === 'Username-Password-Authentication'
-  );
-
-  if (!auth0Connection) {
-    throw new Error('Username-Password-Authentication connection not found');
-  }
-
-  console.log('Creating export job...');
-  // Create export job
+  console.log('Creating export job for all users...');
+  // Create export job for ALL users (no connection_id filter)
   const jobRes = await fetch(`https://${domain}/api/v2/jobs/users-exports`, {
     method: 'POST',
     headers: {
@@ -128,7 +114,6 @@ async function getAllUsersViaExport(): Promise<any[]> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      connection_id: auth0Connection.id,
       format: 'json',
       fields: [
         { name: 'user_id' },
@@ -144,6 +129,7 @@ async function getAllUsersViaExport(): Promise<any[]> {
         { name: 'blocked' },
         { name: 'app_metadata' },
         { name: 'user_metadata' },
+        { name: 'identities' },
       ],
     }),
   });

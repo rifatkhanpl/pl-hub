@@ -14,6 +14,11 @@ interface Auth0User {
   blocked?: boolean;
   app_metadata?: Record<string, any>;
   user_metadata?: Record<string, any>;
+  identities?: Array<{
+    connection: string;
+    provider: string;
+    isSocial: boolean;
+  }>;
 }
 
 interface UsersResponse {
@@ -67,7 +72,7 @@ export function Auth0ManagementPage() {
       const params = new URLSearchParams({
         path: '/users/export-all',
         page: '0',
-        per_page: '10000', // Get all users at once
+        per_page: '999999', // Get all users at once (no limit)
       });
 
       const response = await fetch(`${EDGE_FUNCTION_URL}?${params}`, {
@@ -389,6 +394,45 @@ export function Auth0ManagementPage() {
     return new Date(dateString).toLocaleString();
   };
 
+  const getConnectionType = (user: Auth0User): string => {
+    // First try to get from identities array
+    if (user.identities && user.identities.length > 0) {
+      const identity = user.identities[0];
+      if (identity.connection) return identity.connection;
+      if (identity.provider) return identity.provider;
+    }
+
+    // Fallback: Parse from user_id (format: "provider|id")
+    if (user.user_id && user.user_id.includes('|')) {
+      const provider = user.user_id.split('|')[0];
+      // Map common provider prefixes to readable names
+      const providerMap: Record<string, string> = {
+        'auth0': 'Username-Password-Authentication',
+        'google-oauth2': 'google-oauth2',
+        'github': 'github',
+        'windowslive': 'microsoft',
+        'linkedin': 'linkedin',
+        'facebook': 'facebook',
+        'twitter': 'twitter',
+        'samlp': 'SAML',
+        'waad': 'Azure AD',
+      };
+      return providerMap[provider] || provider;
+    }
+
+    return 'Unknown';
+  };
+
+  const getConnectionBadgeColor = (connection: string): string => {
+    const lowerConnection = connection.toLowerCase();
+    if (lowerConnection.includes('google')) return 'bg-red-100 text-red-800';
+    if (lowerConnection.includes('github')) return 'bg-gray-800 text-white';
+    if (lowerConnection.includes('password') || lowerConnection.includes('auth0')) return 'bg-blue-100 text-blue-800';
+    if (lowerConnection.includes('saml')) return 'bg-purple-100 text-purple-800';
+    if (lowerConnection.includes('microsoft') || lowerConnection.includes('azure')) return 'bg-sky-100 text-sky-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -555,6 +599,9 @@ export function Auth0ManagementPage() {
                     </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Connection
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Email Verified
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -612,6 +659,11 @@ export function Auth0ManagementPage() {
                           <div className="text-sm text-gray-500">{user.email}</div>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getConnectionBadgeColor(getConnectionType(user))}`}>
+                        {getConnectionType(user)}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       {user.email_verified ? (
