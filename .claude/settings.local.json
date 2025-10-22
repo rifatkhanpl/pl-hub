@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(set SUPABASE_ACCESS_TOKEN=sbp_0438fd7bd3cfa80a89c83e5fa53879c5cb0c3fe4)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(curl -X GET \"https://eionkwtlzkjsabstiycy.supabase.co/functions/v1/auth0-management?path=/users&page=0&per_page=5\")",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
