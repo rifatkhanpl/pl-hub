@@ -28,7 +28,7 @@ interface UsersResponse {
   limit: number;
 }
 
-type SortField = 'email' | 'name' | 'created_at' | 'last_login' | 'logins_count';
+type SortField = 'email' | 'name' | 'created_at' | 'last_login' | 'logins_count' | 'connection';
 type SortOrder = 'asc' | 'desc';
 
 export function Auth0ManagementPage() {
@@ -50,6 +50,7 @@ export function Auth0ManagementPage() {
   const [filters, setFilters] = useState({
     status: 'all', // all, active, blocked
     emailVerified: 'all', // all, verified, unverified
+    connection: 'all', // all, or specific connection
   });
 
   const EDGE_FUNCTION_URL = import.meta.env.VITE_AUTH0_EDGE_FUNCTION_URL || 'YOUR_EDGE_FUNCTION_URL';
@@ -97,6 +98,35 @@ export function Auth0ManagementPage() {
     }
   };
 
+  const getConnectionType = (user: Auth0User): string => {
+    // First try to get from identities array
+    if (user.identities && user.identities.length > 0) {
+      const identity = user.identities[0];
+      if (identity.connection) return identity.connection;
+      if (identity.provider) return identity.provider;
+    }
+
+    // Fallback: Parse from user_id (format: "provider|id")
+    if (user.user_id && user.user_id.includes('|')) {
+      const provider = user.user_id.split('|')[0];
+      // Map common provider prefixes to readable names
+      const providerMap: Record<string, string> = {
+        'auth0': 'Username-Password-Authentication',
+        'google-oauth2': 'google-oauth2',
+        'github': 'github',
+        'windowslive': 'microsoft',
+        'linkedin': 'linkedin',
+        'facebook': 'facebook',
+        'twitter': 'twitter',
+        'samlp': 'SAML',
+        'waad': 'Azure AD',
+      };
+      return providerMap[provider] || provider;
+    }
+
+    return 'Unknown';
+  };
+
   // Client-side filtering, sorting, and pagination
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...allUsers];
@@ -125,10 +155,24 @@ export function Auth0ManagementPage() {
       );
     }
 
+    // Apply connection filter
+    if (filters.connection !== 'all') {
+      result = result.filter(user => getConnectionType(user) === filters.connection);
+    }
+
     // Apply sorting
     result.sort((a, b) => {
-      let aVal: any = a[sortField];
-      let bVal: any = b[sortField];
+      let aVal: any;
+      let bVal: any;
+
+      // Special handling for connection field
+      if (sortField === 'connection') {
+        aVal = getConnectionType(a);
+        bVal = getConnectionType(b);
+      } else {
+        aVal = a[sortField];
+        bVal = b[sortField];
+      }
 
       // Handle null/undefined values
       if (aVal === null || aVal === undefined) aVal = '';
@@ -158,6 +202,16 @@ export function Auth0ManagementPage() {
     const end = start + perPage;
     return filteredAndSortedUsers.slice(start, end);
   }, [filteredAndSortedUsers, page, perPage]);
+
+  // Connection counts
+  const connectionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    allUsers.forEach(user => {
+      const connection = getConnectionType(user);
+      counts[connection] = (counts[connection] || 0) + 1;
+    });
+    return counts;
+  }, [allUsers]);
 
   const totalPages = Math.ceil(filteredAndSortedUsers.length / perPage);
 
@@ -286,11 +340,12 @@ export function Auth0ManagementPage() {
 
   const handleExportCSV = () => {
     const csv = [
-      ['User ID', 'Email', 'Name', 'Email Verified', 'Status', 'Last Login', 'Logins Count', 'Created At'].join(','),
+      ['User ID', 'Email', 'Name', 'Connection', 'Email Verified', 'Status', 'Last Login', 'Logins Count', 'Created At'].join(','),
       ...filteredAndSortedUsers.map(user => [
         user.user_id,
         user.email,
         user.name || '',
+        getConnectionType(user),
         user.email_verified ? 'Yes' : 'No',
         user.blocked ? 'Blocked' : 'Active',
         user.last_login || 'Never',
@@ -394,35 +449,6 @@ export function Auth0ManagementPage() {
     return new Date(dateString).toLocaleString();
   };
 
-  const getConnectionType = (user: Auth0User): string => {
-    // First try to get from identities array
-    if (user.identities && user.identities.length > 0) {
-      const identity = user.identities[0];
-      if (identity.connection) return identity.connection;
-      if (identity.provider) return identity.provider;
-    }
-
-    // Fallback: Parse from user_id (format: "provider|id")
-    if (user.user_id && user.user_id.includes('|')) {
-      const provider = user.user_id.split('|')[0];
-      // Map common provider prefixes to readable names
-      const providerMap: Record<string, string> = {
-        'auth0': 'Username-Password-Authentication',
-        'google-oauth2': 'google-oauth2',
-        'github': 'github',
-        'windowslive': 'microsoft',
-        'linkedin': 'linkedin',
-        'facebook': 'facebook',
-        'twitter': 'twitter',
-        'samlp': 'SAML',
-        'waad': 'Azure AD',
-      };
-      return providerMap[provider] || provider;
-    }
-
-    return 'Unknown';
-  };
-
   const getConnectionBadgeColor = (connection: string): string => {
     const lowerConnection = connection.toLowerCase();
     if (lowerConnection.includes('google')) return 'bg-red-100 text-red-800';
@@ -500,7 +526,7 @@ export function Auth0ManagementPage() {
 
         {showFilters && (
           <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
@@ -531,13 +557,40 @@ export function Auth0ManagementPage() {
                   <option value="unverified">Unverified</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Connection</label>
+                <select
+                  value={filters.connection}
+                  onChange={(e) => {
+                    setFilters({ ...filters, connection: e.target.value });
+                    setPage(0);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Connections</option>
+                  {Object.keys(connectionCounts).sort().map(connection => (
+                    <option key={connection} value={connection}>{connection}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}
 
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Total users: {allUsers.length} {filters.status !== 'all' || filters.emailVerified !== 'all' || searchQuery ? `(${filteredAndSortedUsers.length} filtered)` : ''}
+            <div>
+              Total users: {allUsers.length} {filters.status !== 'all' || filters.emailVerified !== 'all' || filters.connection !== 'all' || searchQuery ? `(${filteredAndSortedUsers.length} filtered)` : ''}
+            </div>
+            <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-2">
+              {Object.entries(connectionCounts)
+                .sort(([, a], [, b]) => b - a)
+                .map(([connection, count]) => (
+                  <span key={connection} className={`px-2 py-0.5 rounded ${getConnectionBadgeColor(connection)}`}>
+                    {connection}: {count}
+                  </span>
+                ))}
+            </div>
           </div>
           {selectedUsers.size > 0 && (
             <div className="flex items-center gap-2">
@@ -599,7 +652,15 @@ export function Auth0ManagementPage() {
                     </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Connection
+                    <button
+                      onClick={() => handleSort('connection')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Connection
+                      {sortField === 'connection' && (
+                        sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                      )}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Email Verified
